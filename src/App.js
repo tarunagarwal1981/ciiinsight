@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Typography, Container, Box, TextField, Button, CircularProgress } from '@material-ui/core';
 import axios from 'axios';
+import { MapContainer, TileLayer, Polyline, Marker } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 function App() {
   const [vesselName, setVesselName] = useState('');
@@ -8,6 +11,23 @@ function App() {
   const [ciiResults, setCiiResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [ports, setPorts] = useState(['', '']);
+  const [route, setRoute] = useState([]);
+  const [distance, setDistance] = useState(0);
+  const [portList, setPortList] = useState([]);
+
+  useEffect(() => {
+    // Load port list
+    fetch('/UpdatedPub150.csv')
+      .then(response => response.text())
+      .then(data => {
+        const ports = data.split('\n').slice(1).map(line => {
+          const [name, lat, lon] = line.split(',');
+          return { name, lat: parseFloat(lat), lon: parseFloat(lon) };
+        });
+        setPortList(ports);
+      });
+  }, []);
 
   const handleCalculate = async () => {
     setLoading(true);
@@ -16,21 +36,7 @@ function App() {
       const response = await axios.get('/.netlify/functions/getVesselData', {
         params: { vesselName, year }
       });
-      const data = response.data;
-      // Perform CII calculation here
-      const attainedAER = data.Attained_AER;
-      const vesselType = data.vessel_type;
-      const capacity = data.capacity;
-
-      // This is a placeholder calculation. Replace with actual CII calculation logic.
-      const ciiRating = calculateCIIRating(attainedAER, vesselType, capacity, year);
-
-      setCiiResults({
-        attainedAER,
-        ciiRating,
-        vesselType,
-        capacity
-      });
+      setCiiResults(response.data);
     } catch (err) {
       setError('Failed to fetch data. Please try again.');
       console.error(err);
@@ -39,11 +45,24 @@ function App() {
     }
   };
 
-  // Placeholder function. Replace with actual CII rating calculation.
-  const calculateCIIRating = (attainedAER, vesselType, capacity, year) => {
-    // This is a dummy calculation. Replace with the actual logic.
-    const rating = ['A', 'B', 'C', 'D', 'E'][Math.floor(Math.random() * 5)];
-    return rating;
+  const handlePortChange = (index, value) => {
+    const newPorts = [...ports];
+    newPorts[index] = value;
+    setPorts(newPorts);
+  };
+
+  const calculateRoute = () => {
+    const startPort = portList.find(p => p.name === ports[0]);
+    const endPort = portList.find(p => p.name === ports[1]);
+    if (startPort && endPort) {
+      setRoute([
+        [startPort.lat, startPort.lon],
+        [endPort.lat, endPort.lon]
+      ]);
+      // Simple distance calculation (this is not accurate for long distances)
+      const dist = L.latLng(startPort.lat, startPort.lon).distanceTo(L.latLng(endPort.lat, endPort.lon)) / 1852; // Convert meters to nautical miles
+      setDistance(Math.round(dist));
+    }
   };
 
   return (
@@ -82,10 +101,42 @@ function App() {
         {ciiResults && (
           <Box my={2}>
             <Typography variant="h6">CII Results</Typography>
-            <Typography>Attained AER: {ciiResults.attainedAER}</Typography>
-            <Typography>CII Rating: {ciiResults.ciiRating}</Typography>
-            <Typography>Vessel Type: {ciiResults.vesselType}</Typography>
-            <Typography>Capacity: {ciiResults.capacity}</Typography>
+            <pre>{JSON.stringify(ciiResults, null, 2)}</pre>
+          </Box>
+        )}
+        <Box my={2}>
+          <Typography variant="h6">Route Calculation</Typography>
+          {ports.map((port, index) => (
+            <TextField
+              key={index}
+              fullWidth
+              label={`Port ${index + 1}`}
+              value={port}
+              onChange={(e) => handlePortChange(index, e.target.value)}
+              margin="normal"
+            />
+          ))}
+          <Button 
+            variant="contained" 
+            color="secondary" 
+            onClick={calculateRoute}
+            disabled={!ports[0] || !ports[1]}
+          >
+            Calculate Route
+          </Button>
+        </Box>
+        {distance > 0 && (
+          <Typography>Distance: {distance} nautical miles</Typography>
+        )}
+        {route.length > 0 && (
+          <Box my={2} style={{ height: '400px' }}>
+            <MapContainer center={[0, 0]} zoom={2} style={{ height: '100%', width: '100%' }}>
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <Polyline positions={route} color="red" />
+              {route.map((position, index) => (
+                <Marker key={index} position={position} />
+              ))}
+            </MapContainer>
           </Box>
         )}
       </Box>
