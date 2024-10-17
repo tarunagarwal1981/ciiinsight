@@ -1,25 +1,20 @@
-# Build settings
 [build]
-  command = "npm run build"
+  command = "CI=false npm run build"
   functions = "functions"
   publish = "build"
 
-# Redirect and rewrite rules
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Build environment settings
 [build.environment]
   NODE_VERSION = "16"
 
-# Function settings
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["pg"]
 
-# Headers to set for all pages
 [[headers]]
   for = "/*"
   [headers.values]
