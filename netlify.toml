@@ -1,6 +1,6 @@
 # Build settings
 [build]
-  command = "CI='' npm run build"
+  command = "npm run build"
   functions = "functions"
   publish = "build"
 
@@ -13,7 +13,6 @@
 # Build environment settings
 [build.environment]
   NODE_VERSION = "16"
-  NODE_OPTIONS = "--openssl-legacy-provider"
 
 # Function settings
 [functions]
