@@ -5,11 +5,7 @@ let pool;
 function getPool() {
   if (!pool) {
     pool = new Pool({
-      host: process.env.DB_HOST,
-      database: process.env.DB_DATABASE,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      port: process.env.DB_PORT,
+      connectionString: process.env.DATABASE_URL,
       ssl: {
         rejectUnauthorized: false
       }
@@ -58,9 +54,7 @@ exports.handler = async function(event, context) {
               COALESCE((SUM("FUEL_CONSUMPTION_ETHANOL") - SUM("FC_FUEL_CONSUMPTION_ETHANOL")) * 1.913, 0)
             ) * 1000000 / (SUM("DISTANCE_TRAVELLED_ACTUAL") * t2."deadweight") AS NUMERIC), 2)
             ELSE NULL
-          END AS "Attained_AER",
-          MIN("REPORT_DATE") AS "Startdate",
-          MAX("REPORT_DATE") AS "Enddate"
+          END AS "Attained_AER"
         FROM 
           "sf_consumption_logs" AS t1
         LEFT JOIN 
@@ -72,9 +66,22 @@ exports.handler = async function(event, context) {
           t1."VESSEL_NAME", t1."VESSEL_IMO", t2."deadweight", t2."vessel_type"
       `, [vesselName, year]);
       
+      if (result.rows.length === 0) {
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: 'No data found for the given vessel and year' })
+        };
+      }
+
+      const vesselData = result.rows[0];
+      
+      // Here you would add the CII calculation logic
+      // This is a placeholder. Replace with actual CII calculation.
+      const ciiRating = calculateCIIRating(vesselData.Attained_AER, vesselData.vessel_type, vesselData.capacity, year);
+
       return {
         statusCode: 200,
-        body: JSON.stringify(result.rows[0] || {})
+        body: JSON.stringify({...vesselData, ciiRating})
       };
     } finally {
       client.release();
@@ -87,3 +94,10 @@ exports.handler = async function(event, context) {
     };
   }
 };
+
+// Placeholder function. Replace with actual CII rating calculation.
+function calculateCIIRating(attainedAER, vesselType, capacity, year) {
+  // This is a dummy calculation. Replace with the actual logic from your Python script.
+  const ratings = ['A', 'B', 'C', 'D', 'E'];
+  return ratings[Math.floor(Math.random() * ratings.length)];
+}
