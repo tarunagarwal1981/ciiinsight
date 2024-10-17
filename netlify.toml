@@ -1,23 +1,29 @@
+# Build settings
 [build]
   command = "CI='' npm run build"
   functions = "functions"
   publish = "build"
 
+# Redirect and rewrite rules
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
+# Build environment settings
 [build.environment]
   NODE_VERSION = "16"
   NODE_OPTIONS = "--openssl-legacy-provider"
 
+# Function settings
 [functions]
   node_bundler = "esbuild"
+  external_node_modules = ["pg"]
 
+# Headers to set for all pages
 [[headers]]
   for = "/*"
-    [headers.values]
+  [headers.values]
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.example.com;"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
