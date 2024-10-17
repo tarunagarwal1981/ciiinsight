@@ -11,7 +11,8 @@
     "react-leaflet": "^3.2.0",
     "recharts": "^2.0.9",
     "@material-ui/core": "^4.11.4",
-    "@material-ui/lab": "^4.0.0-alpha.58"
+    "@material-ui/lab": "^4.0.0-alpha.58",
+    "pg": "^8.7.1"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -39,5 +40,8 @@
   },
   "engines": {
     "node": "16.x"
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.0"
   }
 }
