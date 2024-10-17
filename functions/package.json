@@ -1,0 +1,7 @@
+{
+  "name": "cii-calculator-netlify-functions",
+  "version": "1.0.0",
+  "dependencies": {
+    "pg": "^8.7.1"
+  }
+}
