@@ -4,8 +4,10 @@ let pool;
 
 function getPool() {
   if (!pool) {
+    const connectionString = process.env.DATABASE_URL;
+    console.log('Connecting to database with connection string:', connectionString);
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: connectionString,
       ssl: {
         rejectUnauthorized: false
       }
@@ -15,9 +17,11 @@ function getPool() {
 }
 
 exports.handler = async function(event, context) {
+  console.log('Function invoked with event:', JSON.stringify(event));
   const { vesselName, year } = event.queryStringParameters;
 
   if (!vesselName || !year) {
+    console.log('Missing parameters:', { vesselName, year });
     return {
       statusCode: 400,
       body: JSON.stringify({ error: 'Missing required parameters' })
@@ -25,8 +29,10 @@ exports.handler = async function(event, context) {
   }
 
   try {
+    console.log('Attempting to connect to database');
     const client = await getPool().connect();
     try {
+      console.log('Executing query for:', { vesselName, year });
       const result = await client.query(`
         SELECT 
           t1."VESSEL_NAME" AS "Vessel",
@@ -66,7 +72,10 @@ exports.handler = async function(event, context) {
           t1."VESSEL_NAME", t1."VESSEL_IMO", t2."deadweight", t2."vessel_type"
       `, [vesselName, year]);
       
+      console.log('Query result:', result);
+
       if (result.rows.length === 0) {
+        console.log('No data found for:', { vesselName, year });
         return {
           statusCode: 404,
           body: JSON.stringify({ error: 'No data found for the given vessel and year' })
@@ -74,14 +83,11 @@ exports.handler = async function(event, context) {
       }
 
       const vesselData = result.rows[0];
-      
-      // Here you would add the CII calculation logic
-      // This is a placeholder. Replace with actual CII calculation.
-      const ciiRating = calculateCIIRating(vesselData.Attained_AER, vesselData.vessel_type, vesselData.capacity, year);
+      console.log('Vessel data:', vesselData);
 
       return {
         statusCode: 200,
-        body: JSON.stringify({...vesselData, ciiRating})
+        body: JSON.stringify(vesselData)
       };
     } finally {
       client.release();
@@ -90,14 +96,7 @@ exports.handler = async function(event, context) {
     console.error('Database query error:', err);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to query database' })
+      body: JSON.stringify({ error: 'Failed to query database', details: err.message })
     };
   }
 };
-
-// Placeholder function. Replace with actual CII rating calculation.
-function calculateCIIRating(attainedAER, vesselType, capacity, year) {
-  // This is a dummy calculation. Replace with the actual logic from your Python script.
-  const ratings = ['A', 'B', 'C', 'D', 'E'];
-  return ratings[Math.floor(Math.random() * ratings.length)];
-}
