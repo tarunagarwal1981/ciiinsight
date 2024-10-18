@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Container, Box, TextField, Button, CircularProgress } from '@material-ui/core';
 import axios from 'axios';
-import { MapContainer, TileLayer, Polyline, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -15,6 +15,13 @@ let DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
+
+// This component will update the map view when the route changes
+function ChangeView({ center, zoom }) {
+  const map = useMap();
+  map.setView(center, zoom);
+  return null;
+}
 
 function App() {
   const [vesselName, setVesselName] = useState('');
@@ -90,7 +97,7 @@ function App() {
       // Calculate center and zoom
       const bounds = L.latLngBounds(newRoute);
       setMapCenter(bounds.getCenter());
-      setMapZoom(3);
+      setMapZoom(4);
 
       // Simple distance calculation (this is not accurate for long distances)
       const dist = L.latLng(startPort.lat, startPort.lon).distanceTo(L.latLng(endPort.lat, endPort.lon)) / 1852; // Convert meters to nautical miles
@@ -167,7 +174,8 @@ function App() {
         )}
         {route.length > 0 && (
           <Box my={2} style={{ height: '400px' }}>
-            <MapContainer key={route.toString()} center={mapCenter} zoom={mapZoom} style={{ height: '100%', width: '100%' }}>
+            <MapContainer center={mapCenter} zoom={mapZoom} style={{ height: '100%', width: '100%' }}>
+              <ChangeView center={mapCenter} zoom={mapZoom} />
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <Polyline positions={route} color="red" />
               {route.map((position, index) => (
