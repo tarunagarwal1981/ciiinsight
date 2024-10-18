@@ -4,6 +4,7 @@ import axios from 'axios';
 import { MapContainer, TileLayer, Polyline, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import CIIProjection from './CIIProjection';  // Make sure this component exists
 
 // Fix for default marker icon
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -39,16 +40,32 @@ function App() {
 
   useEffect(() => {
     // Load port list
+    console.log('Starting to load ports...');
+    setDebug(prev => prev + 'Starting to load ports...\n');
+    
     fetch('/UpdatedPub150.csv')
-      .then(response => response.text())
+      .then(response => {
+        console.log('CSV file fetch response:', response);
+        setDebug(prev => prev + `CSV file fetch response status: ${response.status}\n`);
+        return response.text();
+      })
       .then(data => {
+        console.log('CSV data received, first 100 characters:', data.substring(0, 100));
+        setDebug(prev => prev + `CSV data received, first 100 characters: ${data.substring(0, 100)}\n`);
+        
         const ports = data.split('\n').slice(1).map(line => {
           const [name, lat, lon] = line.split(',');
           return { name: name.trim(), lat: parseFloat(lat), lon: parseFloat(lon) };
         }).filter(port => port.name && !isNaN(port.lat) && !isNaN(port.lon));
+        
         setPortList(ports);
         console.log('Loaded ports:', ports.length);
         setDebug(prev => prev + `Loaded ${ports.length} ports.\n`);
+        
+        if (ports.length > 0) {
+          console.log('First port:', ports[0]);
+          setDebug(prev => prev + `First port: ${JSON.stringify(ports[0])}\n`);
+        }
       })
       .catch(err => {
         console.error('Error loading ports:', err);
@@ -80,8 +97,18 @@ function App() {
 
   const calculateRoute = () => {
     setDebug(prev => prev + `Calculating route for ports: ${ports[0]}, ${ports[1]}\n`);
-    const startPort = portList.find(p => p.name.toLowerCase() === ports[0].toLowerCase());
-    const endPort = portList.find(p => p.name.toLowerCase() === ports[1].toLowerCase());
+    
+    // Function to find a port with fuzzy matching
+    const findPort = (portName) => {
+      const lowercaseName = portName.toLowerCase().trim();
+      return portList.find(p => 
+        p.name.toLowerCase().includes(lowercaseName) || 
+        lowercaseName.includes(p.name.toLowerCase())
+      );
+    };
+
+    const startPort = findPort(ports[0]);
+    const endPort = findPort(ports[1]);
     
     setDebug(prev => prev + `Start port: ${JSON.stringify(startPort)}\n`);
     setDebug(prev => prev + `End port: ${JSON.stringify(endPort)}\n`);
@@ -104,8 +131,16 @@ function App() {
       setDistance(Math.round(dist));
       setDebug(prev => prev + `Calculated distance: ${dist} nautical miles\n`);
     } else {
-      setError('One or both ports not found. Please check the port names.');
-      setDebug(prev => prev + `Error: One or both ports not found.\n`);
+      if (!startPort) {
+        setError(`Start port "${ports[0]}" not found. Please check the port name.`);
+        setDebug(prev => prev + `Error: Start port "${ports[0]}" not found.\n`);
+      } else if (!endPort) {
+        setError(`End port "${ports[1]}" not found. Please check the port name.`);
+        setDebug(prev => prev + `Error: End port "${ports[1]}" not found.\n`);
+      } else {
+        setError('An unexpected error occurred while finding ports.');
+        setDebug(prev => prev + `Error: Unexpected error in port lookup.\n`);
+      }
     }
   };
 
@@ -146,6 +181,7 @@ function App() {
           <Box my={2}>
             <Typography variant="h6">CII Results</Typography>
             <pre>{JSON.stringify(ciiResults, null, 2)}</pre>
+            <CIIProjection ciiResults={ciiResults} />
           </Box>
         )}
         <Box my={2}>
