@@ -5,6 +5,17 @@ import { MapContainer, TileLayer, Polyline, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// Fix for default marker icon
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
+
 function App() {
   const [vesselName, setVesselName] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
@@ -15,6 +26,9 @@ function App() {
   const [route, setRoute] = useState([]);
   const [distance, setDistance] = useState(0);
   const [portList, setPortList] = useState([]);
+  const [mapCenter, setMapCenter] = useState([0, 0]);
+  const [mapZoom, setMapZoom] = useState(2);
+  const [debug, setDebug] = useState('');
 
   useEffect(() => {
     // Load port list
@@ -23,9 +37,15 @@ function App() {
       .then(data => {
         const ports = data.split('\n').slice(1).map(line => {
           const [name, lat, lon] = line.split(',');
-          return { name, lat: parseFloat(lat), lon: parseFloat(lon) };
-        });
+          return { name: name.trim(), lat: parseFloat(lat), lon: parseFloat(lon) };
+        }).filter(port => port.name && !isNaN(port.lat) && !isNaN(port.lon));
         setPortList(ports);
+        console.log('Loaded ports:', ports.length);
+        setDebug(prev => prev + `Loaded ${ports.length} ports.\n`);
+      })
+      .catch(err => {
+        console.error('Error loading ports:', err);
+        setDebug(prev => prev + `Error loading ports: ${err.message}\n`);
       });
   }, []);
 
@@ -52,16 +72,33 @@ function App() {
   };
 
   const calculateRoute = () => {
-    const startPort = portList.find(p => p.name === ports[0]);
-    const endPort = portList.find(p => p.name === ports[1]);
+    setDebug(prev => prev + `Calculating route for ports: ${ports[0]}, ${ports[1]}\n`);
+    const startPort = portList.find(p => p.name.toLowerCase() === ports[0].toLowerCase());
+    const endPort = portList.find(p => p.name.toLowerCase() === ports[1].toLowerCase());
+    
+    setDebug(prev => prev + `Start port: ${JSON.stringify(startPort)}\n`);
+    setDebug(prev => prev + `End port: ${JSON.stringify(endPort)}\n`);
+    
     if (startPort && endPort) {
-      setRoute([
+      const newRoute = [
         [startPort.lat, startPort.lon],
         [endPort.lat, endPort.lon]
-      ]);
+      ];
+      setRoute(newRoute);
+      setDebug(prev => prev + `New route: ${JSON.stringify(newRoute)}\n`);
+
+      // Calculate center and zoom
+      const bounds = L.latLngBounds(newRoute);
+      setMapCenter(bounds.getCenter());
+      setMapZoom(3);
+
       // Simple distance calculation (this is not accurate for long distances)
       const dist = L.latLng(startPort.lat, startPort.lon).distanceTo(L.latLng(endPort.lat, endPort.lon)) / 1852; // Convert meters to nautical miles
       setDistance(Math.round(dist));
+      setDebug(prev => prev + `Calculated distance: ${dist} nautical miles\n`);
+    } else {
+      setError('One or both ports not found. Please check the port names.');
+      setDebug(prev => prev + `Error: One or both ports not found.\n`);
     }
   };
 
@@ -130,7 +167,7 @@ function App() {
         )}
         {route.length > 0 && (
           <Box my={2} style={{ height: '400px' }}>
-            <MapContainer center={[0, 0]} zoom={2} style={{ height: '100%', width: '100%' }}>
+            <MapContainer key={route.toString()} center={mapCenter} zoom={mapZoom} style={{ height: '100%', width: '100%' }}>
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <Polyline positions={route} color="red" />
               {route.map((position, index) => (
@@ -139,6 +176,10 @@ function App() {
             </MapContainer>
           </Box>
         )}
+        <Box my={2}>
+          <Typography variant="h6">Debug Information</Typography>
+          <pre>{debug}</pre>
+        </Box>
       </Box>
     </Container>
   );
